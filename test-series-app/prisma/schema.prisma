@@ -1,0 +1,529 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth.js required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Core User Management
+enum UserRole {
+  STUDENT
+  ADMIN
+  SUPER_ADMIN
+  TEST_CREATOR
+  REVIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+model User {
+  id                String     @id @default(cuid())
+  email             String     @unique
+  emailVerified     DateTime?
+  name              String?
+  image             String?
+  phone             String?    @unique
+  phoneVerified     DateTime?
+  role              UserRole   @default(STUDENT)
+  status            UserStatus @default(PENDING_VERIFICATION)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  lastLoginAt       DateTime?
+  
+  // Profile information
+  bio               String?
+  dateOfBirth       DateTime?
+  institution       String?
+  grade             String?
+  targetExam        String?
+  
+  // Preferences
+  preferredSubjects String[]
+  notificationSettings Json?
+  
+  // Relations
+  accounts          Account[]
+  sessions          Session[]
+  testAttempts      TestAttempt[]
+  testResults       TestResult[]
+  discussions       Discussion[]
+  comments          Comment[]
+  studyMaterials    StudyMaterial[]
+  createdTests      Test[]
+  analytics         UserAnalytics[]
+  achievements      UserAchievement[]
+  rankings          Ranking[]
+  
+  @@map("users")
+}
+
+// Subject and Category Management
+model Subject {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  code        String     @unique
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  categories  Category[]
+  tests       Test[]
+  questions   Question[]
+  materials   StudyMaterial[]
+  
+  @@map("subjects")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  subjectId   String
+  parentId    String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  subject     Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  questions   Question[]
+  
+  @@map("categories")
+}
+
+// Test Management
+enum TestType {
+  PRACTICE
+  MOCK
+  LIVE
+  SCHEDULED
+  ADAPTIVE
+}
+
+enum TestStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum DifficultyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+model Test {
+  id              String         @id @default(cuid())
+  title           String
+  description     String?
+  type            TestType
+  status          TestStatus     @default(DRAFT)
+  difficulty      DifficultyLevel
+  duration        Int            // in minutes
+  totalMarks      Int
+  passingMarks    Int
+  instructions    String?
+  
+  // Scheduling
+  scheduledAt     DateTime?
+  startTime       DateTime?
+  endTime         DateTime?
+  
+  // Access control
+  isPublic        Boolean        @default(true)
+  allowedUsers    String[]       // User IDs
+  maxAttempts     Int            @default(1)
+  
+  // Metadata
+  createdById     String
+  subjectId       String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  // Relations
+  createdBy       User           @relation(fields: [createdById], references: [id])
+  subject         Subject        @relation(fields: [subjectId], references: [id])
+  questions       TestQuestion[]
+  attempts        TestAttempt[]
+  results         TestResult[]
+  analytics       TestAnalytics[]
+  
+  @@map("tests")
+}
+
+// Question Management
+enum QuestionType {
+  MCQ_SINGLE
+  MCQ_MULTIPLE
+  TRUE_FALSE
+  DESCRIPTIVE
+  CODING
+  FILL_BLANKS
+  MATCHING
+  ORDERING
+}
+
+model Question {
+  id              String        @id @default(cuid())
+  title           String
+  description     String
+  type            QuestionType
+  difficulty      DifficultyLevel
+  marks           Int
+  negativeMarks   Int           @default(0)
+  timeLimit       Int?          // in seconds
+  
+  // Question content
+  content         Json          // Flexible content structure
+  options         Json?         // For MCQ questions
+  correctAnswer   Json          // Correct answer(s)
+  explanation     String?
+  hints           String[]
+  
+  // Metadata
+  subjectId       String
+  categoryId      String?
+  tags            String[]
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  subject         Subject       @relation(fields: [subjectId], references: [id])
+  category        Category?     @relation(fields: [categoryId], references: [id])
+  testQuestions   TestQuestion[]
+  answers         Answer[]
+  discussions     Discussion[]
+  
+  @@map("questions")
+}
+
+model TestQuestion {
+  id         String @id @default(cuid())
+  testId     String
+  questionId String
+  order      Int
+  marks      Int?   // Override question marks if needed
+  
+  test       Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  @@unique([testId, questionId])
+  @@unique([testId, order])
+  @@map("test_questions")
+}
+
+// Test Attempt and Results
+enum AttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  SUBMITTED
+  AUTO_SUBMITTED
+  ABANDONED
+}
+
+model TestAttempt {
+  id              String        @id @default(cuid())
+  userId          String
+  testId          String
+  status          AttemptStatus @default(IN_PROGRESS)
+  startedAt       DateTime      @default(now())
+  submittedAt     DateTime?
+  timeSpent       Int           @default(0) // in seconds
+  currentQuestion Int           @default(1)
+  
+  // Tracking
+  ipAddress       String?
+  userAgent       String?
+  
+  user            User          @relation(fields: [userId], references: [id])
+  test            Test          @relation(fields: [testId], references: [id])
+  answers         Answer[]
+  result          TestResult?
+  
+  @@map("test_attempts")
+}
+
+model Answer {
+  id           String      @id @default(cuid())
+  attemptId    String
+  questionId   String
+  answer       Json        // User's answer
+  isCorrect    Boolean?
+  marksObtained Int        @default(0)
+  timeSpent    Int         @default(0) // in seconds
+  answeredAt   DateTime    @default(now())
+  
+  attempt      TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question     Question    @relation(fields: [questionId], references: [id])
+  
+  @@unique([attemptId, questionId])
+  @@map("answers")
+}
+
+model TestResult {
+  id              String      @id @default(cuid())
+  userId          String
+  testId          String
+  attemptId       String      @unique
+  
+  // Scores
+  totalQuestions  Int
+  attemptedQuestions Int
+  correctAnswers  Int
+  wrongAnswers    Int
+  unanswered      Int
+  totalMarks      Int
+  marksObtained   Int
+  percentage      Float
+  
+  // Performance metrics
+  timeSpent       Int         // in seconds
+  accuracy        Float
+  speed           Float       // questions per minute
+  
+  // Rankings
+  rank            Int?
+  percentile      Float?
+  
+  // Metadata
+  completedAt     DateTime    @default(now())
+  
+  user            User        @relation(fields: [userId], references: [id])
+  test            Test        @relation(fields: [testId], references: [id])
+  attempt         TestAttempt @relation(fields: [attemptId], references: [id])
+  
+  @@map("test_results")
+}
+
+// Analytics and Reporting
+model UserAnalytics {
+  id                    String   @id @default(cuid())
+  userId                String
+  date                  DateTime @default(now())
+  
+  // Daily metrics
+  testsAttempted        Int      @default(0)
+  questionsAnswered     Int      @default(0)
+  correctAnswers        Int      @default(0)
+  timeSpent             Int      @default(0)
+  averageAccuracy       Float    @default(0)
+  averageSpeed          Float    @default(0)
+  
+  // Subject-wise performance
+  subjectPerformance    Json?    // { subjectId: { accuracy, speed, time } }
+  weakAreas             String[]
+  strongAreas           String[]
+  
+  user                  User     @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, date])
+  @@map("user_analytics")
+}
+
+model TestAnalytics {
+  id                    String   @id @default(cuid())
+  testId                String
+  date                  DateTime @default(now())
+  
+  // Test metrics
+  totalAttempts         Int      @default(0)
+  completedAttempts     Int      @default(0)
+  averageScore          Float    @default(0)
+  averageTime           Int      @default(0)
+  averageAccuracy       Float    @default(0)
+  
+  // Question-wise analytics
+  questionAnalytics     Json?    // { questionId: { attempts, correct, avgTime } }
+  difficultyDistribution Json?
+  
+  test                  Test     @relation(fields: [testId], references: [id])
+  
+  @@unique([testId, date])
+  @@map("test_analytics")
+}
+
+// Ranking and Leaderboards
+model Ranking {
+  id         String   @id @default(cuid())
+  userId     String
+  testId     String?
+  subjectId  String?
+  type       String   // OVERALL, TEST, SUBJECT, MONTHLY, etc.
+  rank       Int
+  score      Float
+  period     DateTime // For time-based rankings
+  createdAt  DateTime @default(now())
+  
+  user       User     @relation(fields: [userId], references: [id])
+  
+  @@map("rankings")
+}
+
+// Achievements and Gamification
+model Achievement {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  icon        String?
+  badge       String?
+  points      Int      @default(0)
+  criteria    Json     // Achievement criteria
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  userAchievements UserAchievement[]
+  
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  achievementId String
+  earnedAt      DateTime    @default(now())
+  
+  user          User        @relation(fields: [userId], references: [id])
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+// Discussion Forum
+model Discussion {
+  id          String    @id @default(cuid())
+  title       String
+  content     String
+  userId      String
+  questionId  String?
+  testId      String?
+  isResolved  Boolean   @default(false)
+  isPinned    Boolean   @default(false)
+  views       Int       @default(0)
+  likes       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  user        User      @relation(fields: [userId], references: [id])
+  question    Question? @relation(fields: [questionId], references: [id])
+  comments    Comment[]
+  
+  @@map("discussions")
+}
+
+model Comment {
+  id           String     @id @default(cuid())
+  content      String
+  userId       String
+  discussionId String
+  parentId     String?
+  likes        Int        @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+  user         User       @relation(fields: [userId], references: [id])
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  parent       Comment?   @relation("CommentReplies", fields: [parentId], references: [id])
+  replies      Comment[]  @relation("CommentReplies")
+  
+  @@map("comments")
+}
+
+// Study Materials
+enum MaterialType {
+  PDF
+  VIDEO
+  ARTICLE
+  QUIZ
+  FLASHCARD
+  NOTES
+}
+
+model StudyMaterial {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  type        MaterialType
+  content     Json?        // Flexible content
+  fileUrl     String?
+  thumbnailUrl String?
+  
+  // Metadata
+  subjectId   String
+  uploadedById String
+  tags        String[]
+  difficulty  DifficultyLevel
+  estimatedTime Int?       // in minutes
+  
+  // Access control
+  isPublic    Boolean      @default(true)
+  isPremium   Boolean      @default(false)
+  
+  // Stats
+  views       Int          @default(0)
+  downloads   Int          @default(0)
+  rating      Float        @default(0)
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  subject     Subject      @relation(fields: [subjectId], references: [id])
+  uploadedBy  User         @relation(fields: [uploadedById], references: [id])
+  
+  @@map("study_materials")
+}

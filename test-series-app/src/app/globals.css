@@ -1,26 +1,143 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 220 10% 4%;
+    --foreground: 210 40% 98%;
+    --card: 220 13% 6%;
+    --card-foreground: 210 40% 98%;
+    --popover: 220 13% 6%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 195 100% 50%;
+    --primary-foreground: 220 10% 4%;
+    --secondary: 215 28% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 215 28% 17%;
+    --muted-foreground: 217 10% 65%;
+    --accent: 262 83% 70%;
+    --accent-foreground: 220 10% 4%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 195 100% 50%;
+    --chart-1: 195 100% 50%;
+    --chart-2: 262 83% 70%;
+    --chart-3: 330 81% 70%;
+    --chart-4: 91 60% 55%;
+    --chart-5: 24 100% 60%;
+    --radius: 0.75rem;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  
+  body {
+    @apply bg-cyber-darker text-foreground font-sans;
+    background-image: 
+      radial-gradient(circle at 25% 25%, rgba(0, 245, 255, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 75% 75%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .cyber-glow {
+    @apply relative;
+  }
+  
+  .cyber-glow::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-neon-blue via-neon-purple to-neon-pink opacity-20 blur-xl -z-10;
+  }
+  
+  .cyber-border {
+    @apply border border-neon-blue/30 shadow-lg shadow-neon-blue/20;
+  }
+  
+  .cyber-button {
+    @apply relative overflow-hidden bg-gradient-to-r from-neon-blue via-neon-purple to-neon-pink p-[1px] rounded-lg group;
+  }
+  
+  .cyber-button::before {
+    content: '';
+    @apply absolute inset-[1px] bg-cyber-dark rounded-[calc(0.5rem-1px)] transition-all duration-300;
+  }
+  
+  .cyber-button:hover::before {
+    @apply bg-transparent;
+  }
+  
+  .cyber-card {
+    @apply bg-cyber-dark/50 backdrop-blur-sm border border-cyber-light/30 rounded-xl;
+    box-shadow: 
+      0 0 20px rgba(0, 245, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  
+  .cyber-input {
+    @apply bg-cyber-dark/80 border border-cyber-light/30 rounded-lg px-4 py-3 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-neon-blue/50 focus:border-neon-blue/50 transition-all duration-300;
+  }
+  
+  .cyber-glass {
+    @apply bg-black/20 backdrop-blur-md border border-white/10;
+  }
+  
+  .text-gradient {
+    @apply bg-gradient-to-r from-neon-blue via-neon-purple to-neon-pink bg-clip-text text-transparent;
+  }
+  
+  .shimmer-effect {
+    @apply relative overflow-hidden;
+  }
+  
+  .shimmer-effect::after {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full;
+    animation: shimmer 2s infinite;
+  }
+  
+  .floating-element {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  .glow-text {
+    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-cyber-dark;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-neon-blue/50 rounded-full;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-neon-blue/70;
+  }
 }
